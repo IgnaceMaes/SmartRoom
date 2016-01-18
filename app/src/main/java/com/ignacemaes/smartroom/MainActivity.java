@@ -25,18 +25,12 @@ public class MainActivity extends AppCompatActivity
 {
     private MeasureManager measureManager = new MeasureManager();
 
-    @Bind(R.id.value_temperature)
-    TextView temp;
+    @Bind(R.id.value_temperature) TextView temp;
+    @Bind(R.id.value_light) TextView light;
+    @Bind(R.id.value_door) TextView door;
+    @Bind(R.id.value_mode) TextView mode;
 
-    @Bind(R.id.value_light)
-    TextView light;
-
-    @Bind(R.id.value_door)
-    TextView door;
-
-    @Bind(R.id.swiperefreshlayout)
-    SwipeRefreshLayout refreshLayout;
-
+    @Bind(R.id.swiperefreshlayout) SwipeRefreshLayout refreshLayout;
     @Bind(R.id.main_cardcontainer) LinearLayout cardContainer;
 
     private RoomInfo roomInfo;
@@ -71,7 +65,7 @@ public class MainActivity extends AppCompatActivity
             View powerX = inflater.inflate(R.layout.item_power, cardContainer, false);
 
             ((TextView) powerX.findViewById(R.id.title_power)).setText("Powerswitch " + i);
-            ((TextView) powerX.findViewById(R.id.value_power)).setText("current: " + (currentOn ? "on" : "off"));
+            ((TextView) powerX.findViewById(R.id.value_power)).setText("Current: " + (currentOn ? "on" : "off"));
 
             powerX.setOnClickListener(new View.OnClickListener()
             {
@@ -114,6 +108,7 @@ public class MainActivity extends AppCompatActivity
                         setTempValue(roomInfo.getTemperature());
                         setLightValue(roomInfo.getLight());
                         setDoorValue(roomInfo.isDoorClosed());
+                        setModeValue(roomInfo.isAutoswitch());
 
                         initializeLayout();
 
@@ -126,6 +121,26 @@ public class MainActivity extends AppCompatActivity
                         Snackbar.make(temp, "Failed to load roominfo", Snackbar.LENGTH_LONG).show();
 
                         refreshLayout.setRefreshing(false);
+                    }
+                });
+    }
+
+    @OnClick(R.id.card_mode) void onToggleMode()
+    {
+        measureManager.setAutoswitchMode(!roomInfo.isAutoswitch())
+                .enqueue(new Callback<PowerReply>()
+                {
+                    @Override
+                    public void onResponse(Response<PowerReply> response, Retrofit retrofit)
+                    {
+                        Snackbar.make(temp, response.body().getMessage(), Snackbar.LENGTH_LONG).show();
+                        refreshRoomInfo();
+                    }
+
+                    @Override
+                    public void onFailure(Throwable t)
+                    {
+                        Snackbar.make(temp, "Failed to toggle mode", Snackbar.LENGTH_LONG).show();
                     }
                 });
     }
@@ -143,5 +158,10 @@ public class MainActivity extends AppCompatActivity
     private void setDoorValue(boolean closed)
     {
         door.setText(String.format("Current: %s", closed ? "closed" : "open"));
+    }
+
+    private void setModeValue(boolean isInAutoswitchMode)
+    {
+        mode.setText(String.format("Current: %s", isInAutoswitchMode ? "on" : "off"));
     }
 }

@@ -16,5 +16,8 @@ public interface MeasureService
     Call<RoomInfo> getRoomInfo();
 
     @GET("/power")
-    Call<PowerReply> power(@Query("id") String id, @Query("action") String action);
+    Call<PowerReply> power(@Query("id") String id, @Query("a") String action);
+
+    @GET("/mode")
+    Call<PowerReply> setAutoswitchMode(@Query("a") String action);
 }

@@ -35,4 +35,10 @@ public class MeasureManager
         String action = on ? "on" : "off";
         return service.power(String.valueOf(powerswitchIndex), action);
     }
+
+    public Call<PowerReply> setAutoswitchMode(boolean on)
+    {
+        String action = on ? "on" : "off";
+        return service.setAutoswitchMode(action);
+    }
 }

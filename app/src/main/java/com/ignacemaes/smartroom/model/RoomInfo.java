@@ -10,6 +10,7 @@ public class RoomInfo
     private double temperature;
     private int light;
     private boolean doorClosed;
+    private boolean autoswitch;
     private List<Boolean> powerswitchStates;
 
     public double getTemperature()
@@ -40,6 +41,16 @@ public class RoomInfo
     public void setDoorClosed(boolean doorClosed)
     {
         this.doorClosed = doorClosed;
+    }
+
+    public boolean isAutoswitch()
+    {
+        return autoswitch;
+    }
+
+    public void setAutoswitch(boolean autoswitch)
+    {
+        this.autoswitch = autoswitch;
     }
 
     public List<Boolean> getPowerswitchStates()

@@ -6,10 +6,11 @@
 #define PIN_PHOTOCELL 1
 #define PIN_REED_SWITCH 2
 #define PIN_TRANSMITTER 3
-#define TRANSMISSION_LENTH 24
+#define TRANSMISSION_LENGTH 24
 #define POWERSWITCH_AMOUNT 2
 #define POWERSWITCH_ON 0
 #define POWERSWITCH_OFF 1
+#define POWERSWITCH_TO_TOGGLE 0
 
 byte mac[] = { 0x54, 0x34, 0x41, 0x30, 0x30, 0x31 };                                    
 IPAddress ip(192, 168, 1, 170);                        
@@ -17,10 +18,9 @@ EthernetServer server(80);
 
 RCSwitch mySwitch = RCSwitch();
 
-//ON-OFF codes for each powerswitch
-unsigned long powerswitches[POWERSWITCH_AMOUNT][2] = { {15511983, 15511982}, {15511981, 15511980 } };
-//states of the power switches (on = true, off = false)
-boolean powerswitchStates[POWERSWITCH_AMOUNT] = { false, false };
+unsigned long powerswitches[POWERSWITCH_AMOUNT][2] = { {15511983, 15511982}, {15511981, 15511980 } }; //ON-OFF codes for each powerswitch
+boolean powerswitchStates[POWERSWITCH_AMOUNT] = { false, false }; // on = true, off = false
+boolean autoswitchMode = true;
 
 void setup() {
   Serial.begin(9600);
@@ -35,6 +35,18 @@ void setup() {
 }
 
 void loop() {
+  if (autoswitchMode) 
+  {
+    // check door state to toggle power switch if needed (door opens? turn on power switch, door closes? turn off power switch)
+    boolean isDoorClosed = readReedSwitch(PIN_REED_SWITCH);
+    if (isDoorClosed == powerswitchStates[POWERSWITCH_TO_TOGGLE])
+    {
+      powerswitchStates[POWERSWITCH_TO_TOGGLE] = !isDoorClosed;
+      transmitToPowerswitch(POWERSWITCH_TO_TOGGLE, powerswitchStates[POWERSWITCH_TO_TOGGLE] ? POWERSWITCH_ON : POWERSWITCH_OFF);
+      delay(1000); // safety precaution
+    }
+  }
+  
   // listen for incoming clients
   EthernetClient client = server.available();
 
@@ -55,7 +67,7 @@ void loop() {
           httpRequest += c;
         }
 
-        //complete request
+        // complete request
         if (c == '\n' && currentLineIsBlank) 
         {          
             client.println("HTTP/1.1 200 OK");     
@@ -63,7 +75,20 @@ void loop() {
             client.println("Connection: close");
             client.println();
               
-            if (containsString(httpRequest, "GET /power"))
+            if (containsString(httpRequest, "GET /mode"))
+            {                   
+              if (containsString(httpRequest, "a=on"))
+              {
+                autoswitchMode = true;
+              }
+              else if (containsString(httpRequest, "a=off"))
+              {
+                autoswitchMode = false;
+              }
+              
+              sendOk(client);
+            } 
+            else if (containsString(httpRequest, "GET /power"))
             {                          
               for (int powerswitchIndex = 0; powerswitchIndex < POWERSWITCH_AMOUNT; powerswitchIndex++)
               {
@@ -71,22 +96,18 @@ void loop() {
                 String powerswitchCheck = powerswitch + powerswitchIndex;
                 if (containsString(httpRequest, powerswitchCheck))
                 {                    
-                  if (containsString(httpRequest, "action=on"))
+                  if (containsString(httpRequest, "a=on"))
                   {
                     transmitToPowerswitch(powerswitchIndex, POWERSWITCH_ON);
                   }
-                  else if (containsString(httpRequest, "action=off"))
+                  else if (containsString(httpRequest, "a=off"))
                   {
                     transmitToPowerswitch(powerswitchIndex, POWERSWITCH_OFF);
                   }
                 } 
               }
               
-              StaticJsonBuffer<30> jsonBuffer;
-  
-              JsonObject& root = jsonBuffer.createObject();
-              root["message"] = "action completed";
-              root.printTo(client);
+              sendOk(client);
             }
             else 
             {          
@@ -97,6 +118,7 @@ void loop() {
               root["temperature"] = readTemperatureInC(PIN_TEMPERATURE);
               root["light"] = analogRead(PIN_PHOTOCELL);
               root["doorClosed"] = readReedSwitch(PIN_REED_SWITCH);
+              root["autoswitch"] = autoswitchMode;
               
               JsonArray& data = root.createNestedArray("powerswitchStates");  
               for (int powerswitchIndex = 0; powerswitchIndex < POWERSWITCH_AMOUNT; powerswitchIndex++)
@@ -130,17 +152,19 @@ void loop() {
   }
 }
 
+void sendOk(EthernetClient& c)
+{
+  StaticJsonBuffer<20> jsonBuffer;
+  
+  JsonObject& root = jsonBuffer.createObject();
+  root["m"] = "ok";
+  root.printTo(c);
+}
+
 void transmitToPowerswitch(int powerswitchIndex, int action)
 {
   unsigned long transmissionCode = powerswitches[powerswitchIndex][action];
-  /*Serial.print("transmitting code [");
-  Serial.print("index: ");
-  Serial.print(powerswitchIndex);
-  Serial.print(", action: ");
-  Serial.print(action);
-  Serial.print("] Code: ");
-  Serial.println(transmissionCode);*/
-  mySwitch.send(transmissionCode, TRANSMISSION_LENTH);  
+  mySwitch.send(transmissionCode, TRANSMISSION_LENGTH);  
   
   boolean on = action == POWERSWITCH_ON;
   powerswitchStates[powerswitchIndex] = on;
